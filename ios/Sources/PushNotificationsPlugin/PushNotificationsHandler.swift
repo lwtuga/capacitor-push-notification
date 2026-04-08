@@ -1,9 +1,12 @@
 import Capacitor
 import UserNotifications
+import AudioToolbox
+import AVFoundation
 
 public class PushNotificationsHandler: NSObject, NotificationHandlerProtocol {
     public weak var plugin: CAPPlugin?
     var notificationRequestLookup = [String: JSObject]()
+    var player: AVAudioPlayer?
 
     public func requestPermissions(with completion: ((Bool, Error?) -> Void)? = nil) {
         var requestAuthorizationOptions: UNAuthorizationOptions = []
@@ -42,6 +45,11 @@ public class PushNotificationsHandler: NSObject, NotificationHandlerProtocol {
             if silent {
                 return UNNotificationPresentationOptions.init(rawValue: 0)
             }
+        }
+
+        if let critical = notification.request.content.userInfo["criticalalert"] as? String, critical == "1" {
+            playSound(notification.request)
+            return [.alert, .badge]
         }
 
         if let optionsArray = self.plugin?.getConfig().getArray("presentationOptions") as? [String] {
@@ -99,5 +107,23 @@ public class PushNotificationsHandler: NSObject, NotificationHandlerProtocol {
             "body": request.content.body,
             "data": JSTypes.coerceDictionaryToJSObject(request.content.userInfo) ?? [:]
         ]
+    }
+
+    func playSound(_ request: UNNotificationRequest) {
+        if let soundName = request.content.userInfo["sound"] as? String {
+            guard let soundURL = Bundle.main.url(forResource: soundName, withExtension: "wav") else {
+                return
+            }
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+                try AVAudioSession.sharedInstance().setActive(true)
+
+                player = try AVAudioPlayer(contentsOf: soundURL, fileTypeHint: AVFileType.wav.rawValue)
+                player?.volume = 1.0
+                player?.play()
+            } catch let error {
+                print(error.localizedDescription)
+            }
+        }
     }
 }
