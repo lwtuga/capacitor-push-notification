@@ -27,7 +27,8 @@ public class PushNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "removeDeliveredNotifications", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "createChannel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "listChannels", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "deleteChannel", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "deleteChannel", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopRingtone", returnType: CAPPluginReturnPromise)
     ]
     private let notificationDelegateHandler = PushNotificationsHandler()
     private let acknowledgeService = AcknowledgeService()
@@ -187,6 +188,11 @@ public class PushNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func listChannels(_ call: CAPPluginCall) {
         call.unimplemented("Not available on iOS")
+    }
+
+    @objc func stopRingtone(_ call: CAPPluginCall) {
+        PushNotificationsHandler.stopRingtone()
+        call.resolve()
     }
 
     @objc public func onBackgroundNotification(notification: Notification) {
