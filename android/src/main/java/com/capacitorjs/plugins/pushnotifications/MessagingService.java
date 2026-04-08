@@ -3,8 +3,10 @@ package com.capacitorjs.plugins.pushnotifications;
 // import static androidx.core.content.ContextCompat.getSystemService;
 
 import android.app.NotificationManager;
+import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.os.Build;
 import android.util.Log;
@@ -16,6 +18,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import com.capacitorjs.plugins.pushnotifications.acknowledge.AcknowledgeService;
 
 import android.net.Uri;
+import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -27,27 +30,40 @@ import java.util.Objects;
 
 public class MessagingService extends FirebaseMessagingService {
     private final AcknowledgeService acknowledgeService = new AcknowledgeService();
+    private static Ringtone ringtone;
 
     public void handleIntent(Intent intent) {
         Log.i("MessagingService", "intent received");
         super.handleIntent(intent);
+        Bundle bundle = intent.getExtras();
 
-				Bundle bundle = intent.getExtras();
-				if (bundle != null && bundle.containsKey("criticalalert")) {
-          String s1 = bundle.getString("criticalalert");
-          Log.i("MessagingService bundle", s1);
+        SharedPreferences sharedPreferences = getApplicationContext().getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+        String criticalAlert = sharedPreferences.getString("criticalAlert", "0");
+        String sound = sharedPreferences.getString("notificationSound", "");
 
-					if (Objects.equals(s1, "1")) {
-						Log.i("MessagingService bundle", bundle.getString("criticalalert"));
+        // Benutzer muss Lokal criticalAlert gesetzt haben + die Nachricht muss key criticalalert enthalten
+        if (Objects.equals(criticalAlert, "1") && bundle != null && bundle.containsKey("criticalalert")) {
+          Log.i("MessagingService bundle", "criticalalert");
 
-						var audioManager = (AudioManager) getSystemService(ContextWrapper.AUDIO_SERVICE);
-						if(audioManager != null) {
-							int originalRingMode = audioManager.getRingerMode();
+          // Wert aus Nachricht auswerten
+          String bundleCriticalalert = bundle.getString("criticalalert");
+          if (Objects.equals(bundleCriticalalert, "1")) {
+            Log.i("MessagingService sound", "sound");
+            Log.i("MessagingServiceTuGA bundle", criticalAlert);
+            Log.i("MessagingServiceTuGA sound", sound);
+
+            var audioManager = (AudioManager) getSystemService(ContextWrapper.AUDIO_SERVICE);
+            if(audioManager != null) {
+              int originalRingMode = audioManager.getRingerMode();
               //boolean volumeFixed = audioManager.isVolumeFixed();
-							int originalNotificationVolume = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
-							int maxNotificationVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION);
 
-							Log.i("MessagingService", "originalRingMode " + originalRingMode + " " + originalNotificationVolume + " " + maxNotificationVolume);
+              int originalNotificationVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING);
+              int maxNotificationVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING);
+              // bei Xiami Geräten wird STREAM_ALARM statt STREAM_RING verwendet
+              int originalNotificationVolumeAlarm = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+              int maxNotificationVolumeAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+
+              Log.i("MessagingService", "originalRingMode " + originalRingMode + " " + originalNotificationVolume + " " + maxNotificationVolume);
               var notificationManager = (NotificationManager) getSystemService(ContextWrapper.NOTIFICATION_SERVICE);
               int isDndModeEnabled = 0;
               if (notificationManager != null) {
@@ -72,11 +88,11 @@ public class MessagingService extends FirebaseMessagingService {
               }
 
               // When DND mode is enabled, we get ringerMode as silent even though actual ringer mode is Normal
-							//          int isDndModeEnabled = NotificationManagerCompat.from(myContext).getCurrentInterruptionFilter();
-							//          if (isDndModeEnabled != NotificationManager.INTERRUPTION_FILTER_ALL && originalRingMode == AudioManager.RINGER_MODE_SILENT && originalNotificationVolume != 0) {
-							//            originalRingMode = AudioManager.RINGER_MODE_NORMAL;
-							//          }
-							Log.i("MessagingService", "originalNotificationVolume "+originalNotificationVolume+" maxNotificationVolume "+maxNotificationVolume);
+              //          int isDndModeEnabled = NotificationManagerCompat.from(myContext).getCurrentInterruptionFilter();
+              //          if (isDndModeEnabled != NotificationManager.INTERRUPTION_FILTER_ALL && originalRingMode == AudioManager.RINGER_MODE_SILENT && originalNotificationVolume != 0) {
+              //            originalRingMode = AudioManager.RINGER_MODE_NORMAL;
+              //          }
+              Log.i("MessagingService", "originalNotificationVolume "+originalNotificationVolume+" maxNotificationVolume "+maxNotificationVolume);
               // ringToneVolume != null ? (int) Math.ceil(maxNotificationVolume * ringToneVolume) : originalNotificationVolume;
 
               try {
@@ -88,45 +104,91 @@ public class MessagingService extends FirebaseMessagingService {
               Log.i("MessagingService", "RINGER_MODE_NORMAL "+originalRingMode1);
 
               try {
-                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, maxNotificationVolume, 0);
+                audioManager.setStreamVolume(AudioManager.STREAM_RING, maxNotificationVolume, 0);
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxNotificationVolumeAlarm, 0);
               } catch (Exception e) {
                 Log.e("MessagingService", "maxNotificationVolume not set", e);
               }
 
-              int sv1 = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
+              int sv1 = audioManager.getStreamVolume(AudioManager.STREAM_RING);
               Log.i("MessagingService", "sv1 "+sv1);
-							// Resetting the original ring mode, volume and dnd mode
+              int sv1Alarm = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+              Log.i("MessagingService", "sv1Alarm "+sv1Alarm);
+              // Resetting the original ring mode, volume and dnd mode
               int finalOriginalRingMode = originalRingMode;
+
+              Uri soundUri;
+              if (sound != null && !sound.isEmpty()) {
+                  String soundName = sound.substring(0, sound.lastIndexOf('.')); // remove extension
+                  int soundId = getResources().getIdentifier(soundName, "raw", getPackageName());
+                  if (soundId != 0) {
+                      soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + soundId);
+                  } else {
+                      soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                  }
+              } else {
+                  soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+              }
+
+              ringtone = RingtoneManager.getRingtone(getApplicationContext(), soundUri);
+              if (ringtone != null) {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                      ringtone.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                              .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                              .build());
+                  }
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                      ringtone.setVolume(1.0f);
+                  }
+                  ringtone.play();
+              }
+
               new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                  try {
-                    audioManager.setRingerMode(finalOriginalRingMode);
-                  } catch (Exception e) {
-                    Log.e("MessagingService", "finalOriginalRingMode not set", e);
-                  }
+                if (ringtone != null) {
+                    ringtone.stop();
+                }
+                try {
+                  audioManager.setRingerMode(finalOriginalRingMode);
+                } catch (Exception e) {
+                  Log.e("MessagingService", "finalOriginalRingMode not set", e);
+                }
 
-                  try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                      notificationManager.setInterruptionFilter(finalIsDndModeEnabled);
-                    }
-                  } catch (Exception e) {
-                    Log.e("MessagingService", "setInterruptionFilter fehler", e);
+                try {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    notificationManager.setInterruptionFilter(finalIsDndModeEnabled);
                   }
+                } catch (Exception e) {
+                  Log.e("MessagingService", "setInterruptionFilter fehler", e);
+                }
 
-                  try {
-                    audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, originalNotificationVolume, 0);
-                  } catch (Exception e) {
-                    Log.e("MessagingService", "originalNotificationVolume not set", e);
-                  }
-                  int sv2 = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
-                  Log.i("MessagingService", "sv2 "+sv2);
-								}, getSoundFileDuration(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)));
-						}
-					}
-				}
+                try {
+                  audioManager.setStreamVolume(AudioManager.STREAM_RING, originalNotificationVolume, 0);
+                  audioManager.setStreamVolume(AudioManager.STREAM_ALARM, originalNotificationVolumeAlarm, 0);
+                } catch (Exception e) {
+                  Log.e("MessagingService", "originalNotificationVolume not set", e);
+                }
+
+                try {
+                  int sv2 = audioManager.getStreamVolume(AudioManager.STREAM_RING);
+                } catch (Exception e) {
+                  Log.e("MessagingService", "originalNotificationVolume not set3", e);
+                }
+                int sv2 = audioManager.getStreamVolume(AudioManager.STREAM_RING);
+                Log.i("MessagingService", "sv2 " + sv2);
+              }, getSoundFileDuration(soundUri));
+            }
+          }
+        }
 
         this.acknowledgeService.initContent(this);
         this.acknowledgeService.newNotification(intent);
         Log.i("MessagingService", "intent exit");
+    }
+
+    public static void stopRingtone() {
+        if (ringtone != null && ringtone.isPlaying()) {
+            ringtone.stop();
+        }
     }
 
     public int getSoundFileDuration(Uri uri) {
@@ -142,7 +204,10 @@ public class MessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        super.onMessageReceived(remoteMessage);
+        // Only call super if there is no critical alert, so the default notification sound is not played.
+        if (remoteMessage.getData().get("criticalalert") == null) {
+            super.onMessageReceived(remoteMessage);
+        }
         PushNotificationsPlugin.sendRemoteMessage(remoteMessage);
     }
 
