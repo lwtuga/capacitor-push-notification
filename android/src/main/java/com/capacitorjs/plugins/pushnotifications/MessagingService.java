@@ -27,6 +27,8 @@ import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 
 import java.util.Objects;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class MessagingService extends FirebaseMessagingService {
     private final AcknowledgeService acknowledgeService = new AcknowledgeService();
@@ -37,20 +39,35 @@ public class MessagingService extends FirebaseMessagingService {
         super.handleIntent(intent);
         Bundle bundle = intent.getExtras();
 
-        SharedPreferences sharedPreferences = getApplicationContext().getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-        String criticalAlert = sharedPreferences.getString("criticalAlert", "0");
-        String sound = sharedPreferences.getString("notificationSound", "");
+        SharedPreferences sharedPreferences = getApplicationContext().getSharedPreferences("it.tuga.fireteam", Context.MODE_PRIVATE);
+        String criticalAlert = sharedPreferences.getString("criticalalert", "0");
+        String ricalarmton = sharedPreferences.getString("ricalarmton", "");
 
         // Benutzer muss Lokal criticalAlert gesetzt haben + die Nachricht muss key criticalalert enthalten
         if (Objects.equals(criticalAlert, "1") && bundle != null && bundle.containsKey("criticalalert")) {
           Log.i("MessagingService bundle", "criticalalert");
+          String ric = bundle.getString("ric");
+          String subric = bundle.getString("subric");
 
           // Wert aus Nachricht auswerten
           String bundleCriticalalert = bundle.getString("criticalalert");
           if (Objects.equals(bundleCriticalalert, "1")) {
-            Log.i("MessagingService sound", "sound");
+            Log.i("MessagingService ricalarmton", "ricalarmton");
             Log.i("MessagingServiceTuGA bundle", criticalAlert);
-            Log.i("MessagingServiceTuGA sound", sound);
+            Log.i("MessagingServiceTuGA ricalarmton", ricalarmton);
+            Log.i("MessagingServiceTuGA ric", ric);
+            Log.i("MessagingServiceTuGA subric", subric);
+            String sound = null;
+            try {
+              if (Objects.equals(subric, "A")) {
+                sound = new JSONObject(ricalarmton).getJSONObject(ric).getString("alarmtona");
+                Log.i("MessagingServiceTuGA sound", sound);
+              } else {
+                sound = new JSONObject(ricalarmton).getJSONObject(ric).getString("alarmtonc");
+              }
+            } catch (JSONException e) {
+              Log.e("MessagingService", "Error parsing JSON from ricalarmton", e);
+            }
 
             var audioManager = (AudioManager) getSystemService(ContextWrapper.AUDIO_SERVICE);
             if(audioManager != null) {
@@ -119,7 +136,7 @@ public class MessagingService extends FirebaseMessagingService {
 
               Uri soundUri;
               if (sound != null && !sound.isEmpty()) {
-                  String soundName = sound.substring(0, sound.lastIndexOf('.')); // remove extension
+                  String soundName = sound;
                   int soundId = getResources().getIdentifier(soundName, "raw", getPackageName());
                   if (soundId != 0) {
                       soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + soundId);
