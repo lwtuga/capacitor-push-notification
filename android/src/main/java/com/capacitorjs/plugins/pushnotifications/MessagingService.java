@@ -3,6 +3,7 @@ package com.capacitorjs.plugins.pushnotifications;
 // import static androidx.core.content.ContextCompat.getSystemService;
 
 import android.app.NotificationManager;
+import android.app.NotificationChannel;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -36,6 +37,30 @@ public class MessagingService extends FirebaseMessagingService {
 
     public void handleIntent(Intent intent) {
         Log.i("MessagingService", "intent received");
+
+        // 1. Channel VOR der Verarbeitung durch das System/Plugin erstellen -> unterdrückt den Systemton
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+          if (notificationManager != null) {
+            // Die ID "critical_alerts_silent" muss mit der channel_id im Push-Payload übereinstimmen
+            String channelId = "critical_alerts_silent";
+            NotificationChannel channel = notificationManager.getNotificationChannel(channelId);
+
+            if (channel == null) {
+              channel = new NotificationChannel(
+                channelId,
+                "Kritische Alarme",
+                NotificationManager.IMPORTANCE_HIGH
+              );
+              // Absolut stumm schalten
+              channel.setSound(null, null);
+              channel.enableVibration(true);
+              notificationManager.createNotificationChannel(channel);
+              Log.i("MessagingService", "Silent Channel erstellt");
+            }
+          }
+        }
+
         super.handleIntent(intent);
         Bundle bundle = intent.getExtras();
 
@@ -242,7 +267,7 @@ public class MessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        // Only call super if there is no critical alert, so the default notification sound is not played.
+        // Only call super if there is no critical alert and no custom sound (ric/subric), so the default notification sound is not played.
         if (remoteMessage.getData().get("criticalalert") == null) {
             super.onMessageReceived(remoteMessage);
         }
