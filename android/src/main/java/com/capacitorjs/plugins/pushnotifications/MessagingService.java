@@ -43,11 +43,26 @@ public class MessagingService extends FirebaseMessagingService {
         String criticalAlert = sharedPreferences.getString("criticalalert", "0");
         String ricalarmton = sharedPreferences.getString("ricalarmton", "");
 
+        String ric = bundle.getString("ric");
+        String subric = bundle.getString("subric");
+        Log.i("MessagingServiceTuGA ric", ric);
+        Log.i("MessagingServiceTuGA subric", subric);
+
+        String sound = null;
+        try {
+          if (Objects.equals(subric, "A")) {
+            sound = new JSONObject(ricalarmton).getJSONObject(ric).getString("alarmtona");
+            Log.i("MessagingServiceTuGA sound", sound);
+          } else {
+            sound = new JSONObject(ricalarmton).getJSONObject(ric).getString("alarmtonc");
+          }
+        } catch (JSONException e) {
+          Log.e("MessagingService", "Error parsing JSON from ricalarmton", e);
+        }
+
         // Benutzer muss Lokal criticalAlert gesetzt haben + die Nachricht muss key criticalalert enthalten
         if (Objects.equals(criticalAlert, "1") && bundle != null && bundle.containsKey("criticalalert")) {
           Log.i("MessagingService bundle", "criticalalert");
-          String ric = bundle.getString("ric");
-          String subric = bundle.getString("subric");
 
           // Wert aus Nachricht auswerten
           String bundleCriticalalert = bundle.getString("criticalalert");
@@ -55,19 +70,6 @@ public class MessagingService extends FirebaseMessagingService {
             Log.i("MessagingService ricalarmton", "ricalarmton");
             Log.i("MessagingServiceTuGA bundle", criticalAlert);
             Log.i("MessagingServiceTuGA ricalarmton", ricalarmton);
-            Log.i("MessagingServiceTuGA ric", ric);
-            Log.i("MessagingServiceTuGA subric", subric);
-            String sound = null;
-            try {
-              if (Objects.equals(subric, "A")) {
-                sound = new JSONObject(ricalarmton).getJSONObject(ric).getString("alarmtona");
-                Log.i("MessagingServiceTuGA sound", sound);
-              } else {
-                sound = new JSONObject(ricalarmton).getJSONObject(ric).getString("alarmtonc");
-              }
-            } catch (JSONException e) {
-              Log.e("MessagingService", "Error parsing JSON from ricalarmton", e);
-            }
 
             var audioManager = (AudioManager) getSystemService(ContextWrapper.AUDIO_SERVICE);
             if(audioManager != null) {
@@ -134,18 +136,7 @@ public class MessagingService extends FirebaseMessagingService {
               // Resetting the original ring mode, volume and dnd mode
               int finalOriginalRingMode = originalRingMode;
 
-              Uri soundUri;
-              if (sound != null && !sound.isEmpty()) {
-                  String soundName = sound;
-                  int soundId = getResources().getIdentifier(soundName, "raw", getPackageName());
-                  if (soundId != 0) {
-                      soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + soundId);
-                  } else {
-                      soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                  }
-              } else {
-                  soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-              }
+              Uri soundUri = getSoundUri(sound);
 
               ringtone = RingtoneManager.getRingtone(getApplicationContext(), soundUri);
               if (ringtone != null) {
@@ -195,6 +186,26 @@ public class MessagingService extends FirebaseMessagingService {
               }, getSoundFileDuration(soundUri));
             }
           }
+        } else if (ric != null && subric != null && sound != null) {
+          // Normaler Alarm: Benutzerdefinierter Ton mit normaler Lautstärke
+          Log.i("MessagingService", "Normal alarm - playing custom sound");
+          Uri soundUri = getSoundUri(sound);
+
+          ringtone = RingtoneManager.getRingtone(getApplicationContext(), soundUri);
+          if (ringtone != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+              ringtone.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                .build());
+            }
+            ringtone.play();
+          }
+
+          new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (ringtone != null) {
+              ringtone.stop();
+            }
+          }, getSoundFileDuration(soundUri));
         }
 
         this.acknowledgeService.initContent(this);
@@ -217,6 +228,16 @@ public class MessagingService extends FirebaseMessagingService {
       } catch (Exception ex) {
         return 5000;
       }
+    }
+
+    public Uri getSoundUri(String sound) {
+        if (sound != null && !sound.isEmpty()) {
+            int soundId = getResources().getIdentifier(sound, "raw", getPackageName());
+            if (soundId != 0) {
+                return Uri.parse("android.resource://" + getPackageName() + "/" + soundId);
+            }
+        }
+        return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
     }
 
     @Override
