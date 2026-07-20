@@ -67,15 +67,15 @@ public class MessagingService extends FirebaseMessagingService {
         SharedPreferences sharedPreferences = getApplicationContext().getSharedPreferences("it.tuga.fireteam", Context.MODE_PRIVATE);
         String criticalAlert = sharedPreferences.getString("criticalalert", "0");
         String ricalarmton = sharedPreferences.getString("ricalarmton", "");
+        String sound = null;
 
         if(bundle != null) {
           String ric = bundle.getString("ric");
           String subric = bundle.getString("subric");
-          Log.i("MessagingServiceTuGA ric", ric);
-          Log.i("MessagingServiceTuGA subric", subric);
-
-          String sound = null;
           if(ric != null && subric != null) {
+            Log.i("MessagingServiceTuGA ric", ric);
+            Log.i("MessagingServiceTuGA subric", subric);
+            
             try {
               if (Objects.equals(subric, "A")) {
                 sound = new JSONObject(ricalarmton).getJSONObject(ric).getString("alarmtona");
