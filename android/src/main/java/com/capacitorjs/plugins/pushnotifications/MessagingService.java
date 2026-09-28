@@ -85,34 +85,40 @@ public class MessagingService extends FirebaseMessagingService {
         }
 
         // super.handleIntent verwirft doppelt zugestellte Nachrichten, der Code danach würde aber trotzdem laufen
-        boolean duplicate = isDuplicateMessage(intent);
-
-        // ruft bei Datennachrichten onMessageReceived auf, dort wird die Benachrichtigung angezeigt
-        super.handleIntent(intent);
-        if (duplicate) {
+        if (isDuplicateMessage(intent)) {
+            super.handleIntent(intent);
             Log.i("MessagingService", "duplicate message ignored");
             return;
         }
-        Bundle bundle = intent.getExtras();
 
-        if(bundle != null) {
-          String ric = bundle.getString("ric");
-          String subric = bundle.getString("subric");
-          if(ric != null && subric != null) {
-            Log.i("MessagingServiceTuGA ric", ric);
-            Log.i("MessagingServiceTuGA subric", subric);
-          }
-          String sound = getAlarmSound(ric, subric);
-          boolean critical = isCriticalAlarm(bundle.getString("criticalalert"));
-
-          if (sound != null && isSilentSound(sound)) {
-            // Kein Ton und keine Änderung an Klingelmodus, Lautstärke oder Nicht-Stören - ohne kritischen Alarm auch keine Vibration
-            Log.i("MessagingService", critical ? "Silent critical alarm - no sound played" : "Silent alarm - no sound and no vibration");
-          } else if (sound != null) {
-            Log.i("MessagingService", critical ? "Critical alarm - playing custom sound" : "Normal alarm - playing custom sound");
-            playAlarm(sound, critical);
-          }
+        String ric = intent.getStringExtra("ric");
+        String subric = intent.getStringExtra("subric");
+        if(ric != null && subric != null) {
+          Log.i("MessagingServiceTuGA ric", ric);
+          Log.i("MessagingServiceTuGA subric", subric);
         }
+        String sound = getAlarmSound(ric, subric);
+        boolean critical = isCriticalAlarm(intent.getStringExtra("criticalalert"));
+
+        if (sound != null && NotificationParams.isNotification(intent.getExtras())) {
+            // Notification-Nachrichten zeigt Firebase selbst mit dem Kanal aus der Nachricht an, dieser umgeht Nicht-Stören
+            // nicht (nur in der Benachrichtigungsleiste, kein Pop-up) - deshalb derselbe Kanal wie bei Datennachrichten
+            String channelId = getChannelId(sound, isSilentSound(sound) && !critical, intent.getStringExtra("gcm.n.android_channel_id"));
+            intent.putExtra("gcm.n.android_channel_id", channelId);
+        }
+
+        // Der Alarmton wird vor dem Anzeigen der Benachrichtigung gestartet: ein dafür aufgehobenes Nicht-Stören
+        // würde die Benachrichtigung sonst abfangen, auch wenn es kurz danach aufgehoben wird
+        if (sound != null && isSilentSound(sound)) {
+          // Kein Ton und keine Änderung an Klingelmodus, Lautstärke oder Nicht-Stören - ohne kritischen Alarm auch keine Vibration
+          Log.i("MessagingService", critical ? "Silent critical alarm - no sound played" : "Silent alarm - no sound and no vibration");
+        } else if (sound != null) {
+          Log.i("MessagingService", critical ? "Critical alarm - playing custom sound" : "Normal alarm - playing custom sound");
+          playAlarm(sound, critical);
+        }
+
+        // zeigt Notification-Nachrichten an bzw. ruft bei Datennachrichten onMessageReceived auf, dort wird die Benachrichtigung angezeigt
+        super.handleIntent(intent);
 
         this.acknowledgeService.initContent(this);
         this.acknowledgeService.newNotification(intent);
