@@ -21,7 +21,8 @@ public class NotificationDataExtractor {
             if (messageType == null || messageType.equals(Constants.MessageTypes.MESSAGE)) {
                 Log.i("NotificationExtractor", "is message type messageId=" + messageId);
                 Bundle data = intent.getExtras();
-                if (data != null && NotificationParams.isNotification(data)) {
+                // Alarme kommen auch als reine Datennachricht (ohne notification-Teil)
+                if (data != null && (NotificationParams.isNotification(data) || data.containsKey("notificationLogId"))) {
                     return data;
                 }
             }
