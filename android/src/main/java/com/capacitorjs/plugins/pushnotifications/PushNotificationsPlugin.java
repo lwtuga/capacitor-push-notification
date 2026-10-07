@@ -2,8 +2,11 @@ package com.capacitorjs.plugins.pushnotifications;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AppOpsManager;
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
@@ -12,6 +15,7 @@ import androidx.core.app.ActivityCompat;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Process;
 import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
@@ -23,6 +27,7 @@ import com.google.firebase.messaging.CommonNotificationBuilder;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.NotificationParams;
 import com.google.firebase.messaging.RemoteMessage;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -189,6 +194,56 @@ public class PushNotificationsPlugin extends Plugin {
     JSObject ret = new JSObject();
     ret.put("value", "true");
     call.resolve(ret);
+  }
+
+  // Xiaomi (MIUI/HyperOS): ohne "Autostart" startet das System die App für eingehende Pushes nicht im Hintergrund.
+  // Dafür gibt es keine öffentliche API, MIUI speichert die Einstellung als eigene AppOp
+  private static final int MIUI_OP_AUTO_START = 10008;
+
+  /** value: "true" erlaubt bzw. nicht nötig (kein Xiaomi), "false" nicht erlaubt, "unknown" nicht lesbar. required: Xiaomi Gerät */
+  @PluginMethod
+  public void checkAutostart(PluginCall call) {
+    JSObject ret = new JSObject();
+    boolean required = isXiaomi();
+    ret.put("required", required);
+    ret.put("value", required ? getMiuiAutostart() : "true");
+    call.resolve(ret);
+  }
+
+  @PluginMethod
+  public void openAutostartSettings(PluginCall call) {
+    Intent intent = new Intent();
+    intent.setComponent(new ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+    try {
+      getActivity().startActivity(intent);
+    } catch (ActivityNotFoundException | SecurityException e) {
+      // ältere/neuere MIUI Versionen ohne diese Seite: App-Info, dort ist Autostart ebenfalls einstellbar
+      Log.w("PushNotificationsPlugin", "autostart settings not available", e);
+      getActivity().startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getContext().getPackageName(), null)));
+    }
+    call.resolve();
+  }
+
+  private static boolean isXiaomi() {
+    return "xiaomi".equalsIgnoreCase(Build.MANUFACTURER);
+  }
+
+  private String getMiuiAutostart() {
+    try {
+      AppOpsManager appOpsManager = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
+      Method checkOpNoThrow = AppOpsManager.class.getMethod("checkOpNoThrow", int.class, int.class, String.class);
+      int mode = (int) checkOpNoThrow.invoke(appOpsManager, MIUI_OP_AUTO_START, Process.myUid(), getContext().getPackageName());
+      Log.i("PushNotificationsPlugin", "MIUI autostart mode " + mode);
+      if (mode == AppOpsManager.MODE_ALLOWED) {
+        return "true";
+      }
+      if (mode == AppOpsManager.MODE_IGNORED) {
+        return "false";
+      }
+    } catch (Exception e) {
+      Log.w("PushNotificationsPlugin", "MIUI autostart not readable", e);
+    }
+    return "unknown";
   }
 
     private void areEnabledNotificationsBeforeAndroid13(PluginCall call) {

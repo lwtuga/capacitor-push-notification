@@ -135,6 +135,22 @@ export interface PushNotificationsPlugin {
      */
     requestPermissionsDND2(): Promise<PermissionStatus>;
     /**
+     * Autostart bei Xiaomi (MIUI/HyperOS), nur Android.
+     * value: 'true' erlaubt bzw. nicht nötig, 'false' nicht erlaubt, 'unknown' nicht lesbar. required: Xiaomi Gerät
+     *
+     * @since 8.0.0
+     */
+    checkAutostart(): Promise<{
+        value: 'true' | 'false' | 'unknown';
+        required: boolean;
+    }>;
+    /**
+     * Öffnet die Autostart Einstellungen bei Xiaomi (MIUI/HyperOS), nur Android.
+     *
+     * @since 8.0.0
+     */
+    openAutostartSettings(): Promise<void>;
+    /**
      * Called when the push notification registration finishes without problems.
      *
      * Provides the push notification token.
