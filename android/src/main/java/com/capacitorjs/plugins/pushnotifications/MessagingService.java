@@ -62,6 +62,8 @@ public class MessagingService extends FirebaseMessagingService {
     // Vibration während des Alarmtons, wie bei einem Anruf: 1 s vibrieren, 1 s Pause - wiederholt bis zum Ende des Tons
     // (kurze Töne ca. 10 s, lange ca. 30 s). Wiederholend, damit die einmalige Vibration der Benachrichtigung sie nicht ersetzt
     private static final long[] VIBRATION_PATTERN = {0, 1000, 1000};
+    // Kritischer Alarm: so oft wird geprüft, ob die Wecker-Lautstärke noch auf Maximum steht
+    private static final long VOLUME_CHECK_MS = 500;
 
     private static final Object LOCK = new Object();
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
@@ -364,6 +366,9 @@ public class MessagingService extends FirebaseMessagingService {
 
                 int generation = ++alarmGeneration;
                 MAIN_HANDLER.postDelayed(() -> finishAlarm(generation), durationMs + SOUND_END_BUFFER_MS);
+                if (critical) {
+                    MAIN_HANDLER.postDelayed(() -> holdAlarmVolume(generation), VOLUME_CHECK_MS);
+                }
             } catch (RuntimeException e) {
                 // sonst blieben die Einstellungen verändert, ohne dass ein Zurücksetzen geplant ist
                 Log.e("MessagingService", "playing alarm failed", e);
@@ -372,6 +377,21 @@ public class MessagingService extends FirebaseMessagingService {
                 }
                 finishAlarmLocked();
             }
+        }
+    }
+
+    /**
+     * Kritischer Alarm ("Lautlos-Modus umgehen"): immer volle Lautstärke. Manche Geräte setzen die Wecker-Lautstärke
+     * verzögert wieder herab, z.B. nachdem Nicht-Stören oder der Klingelmodus für den Alarm geändert wurde - solange
+     * der Ton läuft, wird sie deshalb wieder auf Maximum gesetzt. Endet mit dem Alarm (removeCallbacksAndMessages).
+     */
+    private static void holdAlarmVolume(int generation) {
+        synchronized (LOCK) {
+            if (generation != alarmGeneration || session == null || !session.critical || ringtone == null) {
+                return;
+            }
+            session.keepAlarmVolumeAtMax();
+            MAIN_HANDLER.postDelayed(() -> holdAlarmVolume(generation), VOLUME_CHECK_MS);
         }
     }
 
@@ -695,6 +715,19 @@ public class MessagingService extends FirebaseMessagingService {
             }
         }
 
+        void keepAlarmVolumeAtMax() {
+            if (audioManager == null) {
+                return;
+            }
+            int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+            int current = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+            if (current < max || audioManager.isStreamMute(AudioManager.STREAM_ALARM)) {
+                Log.w("MessagingService", "critical alarm volume " + current + (audioManager.isStreamMute(AudioManager.STREAM_ALARM) ? " (muted)" : "")
+                    + " lowered by the system - set to " + max + " again");
+                raiseAlarmVolume();
+            }
+        }
+
         private void raiseAlarmVolume() {
             // die echte Lautstärke lesen, bevor sie verändert wird - sonst würde beim Zurücksetzen 0 geschrieben
             if (!originalAlarmVolumeKnown && !audioManager.isStreamMute(AudioManager.STREAM_ALARM)) {
@@ -702,7 +735,9 @@ public class MessagingService extends FirebaseMessagingService {
                 originalAlarmVolumeKnown = true;
             }
             try {
-                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
+                // FLAG_ALLOW_RINGER_MODES: Android lehnt die Änderung sonst bei aktivem Nicht-Stören teils ab
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM),
+                    AudioManager.FLAG_ALLOW_RINGER_MODES);
                 alarmVolumeChanged = true;
             } catch (Exception e) {
                 Log.e("MessagingService", "max alarm volume not set", e);
