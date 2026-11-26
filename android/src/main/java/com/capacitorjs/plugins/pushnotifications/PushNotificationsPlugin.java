@@ -19,6 +19,7 @@ import android.os.Process;
 import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
+import com.capacitorjs.plugins.pushnotifications.vollbild.VollbildAlarm;
 import com.getcapacitor.*;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
@@ -229,11 +230,16 @@ public class PushNotificationsPlugin extends Plugin {
   }
 
   private String getMiuiAutostart() {
+    return getMiuiOp(MIUI_OP_AUTO_START, "autostart");
+  }
+
+  /** MIUI eigene AppOp: "true" erlaubt, "false" nicht erlaubt, "unknown" nicht lesbar */
+  private String getMiuiOp(int op, String name) {
     try {
       AppOpsManager appOpsManager = (AppOpsManager) getContext().getSystemService(Context.APP_OPS_SERVICE);
       Method checkOpNoThrow = AppOpsManager.class.getMethod("checkOpNoThrow", int.class, int.class, String.class);
-      int mode = (int) checkOpNoThrow.invoke(appOpsManager, MIUI_OP_AUTO_START, Process.myUid(), getContext().getPackageName());
-      Log.i("PushNotificationsPlugin", "MIUI autostart mode " + mode);
+      int mode = (int) checkOpNoThrow.invoke(appOpsManager, op, Process.myUid(), getContext().getPackageName());
+      Log.i("PushNotificationsPlugin", "MIUI " + name + " mode " + mode);
       if (mode == AppOpsManager.MODE_ALLOWED) {
         return "true";
       }
@@ -241,9 +247,90 @@ public class PushNotificationsPlugin extends Plugin {
         return "false";
       }
     } catch (Exception e) {
-      Log.w("PushNotificationsPlugin", "MIUI autostart not readable", e);
+      Log.w("PushNotificationsPlugin", "MIUI " + name + " not readable", e);
     }
     return "unknown";
+  }
+
+  // Xiaomi (MIUI/HyperOS) blockiert den Vollbild-Alarm ohne "Auf Sperrbildschirm anzeigen" und
+  // "Pop-up-Fenster beim Ausführen im Hintergrund anzeigen" (eigene AppOps, keine öffentliche API)
+  private static final int MIUI_OP_SHOW_WHEN_LOCKED = 10020;
+  private static final int MIUI_OP_BACKGROUND_START_ACTIVITY = 10021;
+
+  /**
+   * Berechtigungen für den Vollbild-Alarm. required: für mindestens einen RIC ist Vollbild eingeschaltet.
+   * fullScreenIntent: ab Android 14 "Vollbild-Benachrichtigungen" erlaubt (sonst immer true).
+   * overlay: "Über anderen Apps einblenden", damit das Vollbild auch bei entsperrtem Gerät erscheint.
+   * xiaomiLockscreen/xiaomiPopup: "true", "false" oder "unknown" (nicht lesbar), bei anderen Herstellern "true".
+   */
+  @PluginMethod
+  public void checkFullScreenAlarm(PluginCall call) {
+    Context context = getContext();
+    boolean xiaomi = isXiaomi();
+    JSObject ret = new JSObject();
+    ret.put("required", VollbildAlarm.isRequired(context));
+    ret.put("fullScreenIntent", VollbildAlarm.canUseFullScreenIntent(context));
+    ret.put("overlay", Settings.canDrawOverlays(context));
+    ret.put("xiaomi", xiaomi);
+    ret.put("xiaomiLockscreen", xiaomi ? getMiuiOp(MIUI_OP_SHOW_WHEN_LOCKED, "show when locked") : "true");
+    ret.put("xiaomiPopup", xiaomi ? getMiuiOp(MIUI_OP_BACKGROUND_START_ACTIVITY, "background start activity") : "true");
+    call.resolve(ret);
+  }
+
+  /** Ab Android 14 die Einstellung "Vollbild-Benachrichtigungen" der App, davor die Benachrichtigungseinstellungen */
+  @PluginMethod
+  public void openFullScreenIntentSettings(PluginCall call) {
+    String packageName = getContext().getPackageName();
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+        && startSettings(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + packageName)))) {
+      call.resolve();
+      return;
+    }
+    if (!startSettings(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))) {
+      startSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)));
+    }
+    call.resolve();
+  }
+
+  /** "Über anderen Apps einblenden" (ab Android 11 öffnet Android die Liste aller Apps) */
+  @PluginMethod
+  public void openOverlaySettings(PluginCall call) {
+    String packageName = getContext().getPackageName();
+    if (!startSettings(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + packageName)))) {
+      startSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)));
+    }
+    call.resolve();
+  }
+
+  /** Xiaomi "Weitere Berechtigungen" der App (Sperrbildschirm, Pop-up-Fenster im Hintergrund) */
+  @PluginMethod
+  public void openXiaomiPermissionSettings(PluginCall call) {
+    String packageName = getContext().getPackageName();
+    String[] activities = {
+      "com.miui.permcenter.permissions.PermissionsEditorActivity",
+      "com.miui.permcenter.permissions.AppPermissionsEditorActivity"
+    };
+    for (String activity : activities) {
+      Intent intent = new Intent("miui.intent.action.APP_PERM_EDITOR");
+      intent.setClassName("com.miui.securitycenter", activity);
+      intent.putExtra("extra_pkgname", packageName);
+      if (startSettings(intent)) {
+        call.resolve();
+        return;
+      }
+    }
+    startSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)));
+    call.resolve();
+  }
+
+  private boolean startSettings(Intent intent) {
+    try {
+      getActivity().startActivity(intent);
+      return true;
+    } catch (ActivityNotFoundException | SecurityException e) {
+      Log.w("PushNotificationsPlugin", "settings not available " + intent, e);
+      return false;
+    }
   }
 
     private void areEnabledNotificationsBeforeAndroid13(PluginCall call) {

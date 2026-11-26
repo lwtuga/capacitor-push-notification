@@ -2,6 +2,7 @@ package com.capacitorjs.plugins.pushnotifications;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -32,6 +33,7 @@ import com.google.firebase.messaging.NotificationParams;
 import com.google.firebase.messaging.RemoteMessage;
 
 import com.capacitorjs.plugins.pushnotifications.acknowledge.AcknowledgeService;
+import com.capacitorjs.plugins.pushnotifications.vollbild.VollbildAlarm;
 
 import java.util.ArrayDeque;
 import java.util.Locale;
@@ -208,8 +210,22 @@ public class MessagingService extends FirebaseMessagingService {
                 // Alarme sind bei Nicht-Stören "Nur wichtige Unterbrechungen" standardmäßig erlaubt
                 notificationInfo.notificationBuilder.setCategory(NotificationCompat.CATEGORY_ALARM);
             }
+            Intent vollbildIntent = null;
+            if (VollbildAlarm.isVollbild(this, ric)) {
+                // Gesperrt/Bildschirm aus: Android startet die Activity über den Full-Screen-Intent, entsperrt zeigt es
+                // eine Heads-up-Benachrichtigung. Antippen öffnet ebenfalls das Vollbild statt direkt die App.
+                vollbildIntent = VollbildAlarm.createIntent(this, remoteMessage, notificationInfo.tag, notificationInfo.id);
+                PendingIntent vollbildPendingIntent = VollbildAlarm.createPendingIntent(this, vollbildIntent, notificationInfo.tag);
+                notificationInfo.notificationBuilder.setFullScreenIntent(vollbildPendingIntent, true);
+                notificationInfo.notificationBuilder.setContentIntent(vollbildPendingIntent);
+                notificationInfo.notificationBuilder.setCategory(NotificationCompat.CATEGORY_ALARM);
+                Log.i("MessagingService", "Vollbild-Alarm canUseFullScreenIntent=" + VollbildAlarm.canUseFullScreenIntent(this));
+            }
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             notificationManager.notify(notificationInfo.tag, notificationInfo.id, notificationInfo.notificationBuilder.build());
+            if (vollbildIntent != null) {
+                VollbildAlarm.startDirekt(this, vollbildIntent);
+            }
         } catch (RuntimeException e) {
             Log.e("MessagingService", "showing alarm notification failed", e);
         }

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tuga_vollbild_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/tuga_vollbild_hintergrund"
+    android:orientation="vertical"
+    android:paddingLeft="20dp"
+    android:paddingTop="24dp"
+    android:paddingRight="20dp"
+    android:paddingBottom="20dp">
+
+    <!-- Alarmierungszeit (vom Backend mitgesendet), z.B. "26.11.2026 14:03:27" -->
+    <TextView
+        android:id="@+id/tuga_vollbild_zeit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="@color/tuga_vollbild_grau"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <!-- Push-Titel, z.B. "Neuer Einsatz Sammelruf Bozen" -->
+    <TextView
+        android:id="@+id/tuga_vollbild_titel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="4"
+        android:textColor="@color/tuga_vollbild_rot"
+        android:textSize="30sp" />
+
+    <!-- Push-Text -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="24dp"
+        android:layout_weight="1"
+        android:background="@drawable/tuga_vollbild_karte">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <TextView
+                android:id="@+id/tuga_vollbild_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.15"
+                android:padding="24dp"
+                android:textColor="@color/tuga_vollbild_text"
+                android:textIsSelectable="false"
+                android:textSize="26sp" />
+        </ScrollView>
+    </FrameLayout>
+
+    <ProgressBar
+        android:id="@+id/tuga_vollbild_progress"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tuga_vollbild_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textColor="@color/tuga_vollbild_text"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <!-- mit Einsatz: Ich komme / Verzögert / Nicht verfügbar -->
+    <LinearLayout
+        android:id="@+id/tuga_vollbild_buttons_einsatz"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_ichkomme"
+            style="@style/TugaVollbildButton"
+            android:layout_width="match_parent"
+            android:background="@drawable/tuga_vollbild_button_gruen">
+
+            <ImageView style="@style/TugaVollbildButtonIcon" android:contentDescription="@null" android:src="@drawable/tuga_vollbild_ic_check" />
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_ichkomme_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_verzoegert"
+            style="@style/TugaVollbildButton"
+            android:layout_width="match_parent"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/tuga_vollbild_button_orange">
+
+            <ImageView style="@style/TugaVollbildButtonIcon" android:contentDescription="@null" android:src="@drawable/tuga_vollbild_ic_uhr" />
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_verzoegert_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_nichtverfuegbar"
+            style="@style/TugaVollbildButton"
+            android:layout_width="match_parent"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/tuga_vollbild_button_rot">
+
+            <ImageView style="@style/TugaVollbildButtonIcon" android:contentDescription="@null" android:src="@drawable/tuga_vollbild_ic_schliessen" />
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_nichtverfuegbar_text" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ohne Einsatz: App öffnen / Schließen, untereinander wie mit Einsatz -->
+    <LinearLayout
+        android:id="@+id/tuga_vollbild_buttons_ohne_einsatz"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_appoeffnen"
+            style="@style/TugaVollbildButton"
+            android:layout_width="match_parent"
+            android:background="@drawable/tuga_vollbild_button_gruen">
+
+            <ImageView style="@style/TugaVollbildButtonIcon" android:contentDescription="@null" android:src="@drawable/tuga_vollbild_ic_oeffnen" />
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_appoeffnen_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_schliessen"
+            style="@style/TugaVollbildButton"
+            android:layout_width="match_parent"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/tuga_vollbild_button_grau">
+
+            <ImageView style="@style/TugaVollbildButtonIcon" android:contentDescription="@null" android:src="@drawable/tuga_vollbild_ic_schliessen" />
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_schliessen_text" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

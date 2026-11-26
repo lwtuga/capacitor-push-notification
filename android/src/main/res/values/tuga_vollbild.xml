@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vollbild-Alarm (VollbildAlarmActivity). Präfix tuga_vollbild, damit es keine Konflikte mit Ressourcen der App gibt -->
+<resources>
+    <color name="tuga_vollbild_hintergrund">#F8F7FC</color>
+    <color name="tuga_vollbild_karte">#EFEEF6</color>
+    <color name="tuga_vollbild_text">#3C3C43</color>
+    <color name="tuga_vollbild_rot">#FF3B30</color>
+    <color name="tuga_vollbild_gruen">#2DC84D</color>
+    <color name="tuga_vollbild_orange">#FF9500</color>
+    <color name="tuga_vollbild_grau">#8E8E93</color>
+
+    <!-- Texte stehen in VollbildTexte.java: die Sprache der App (de/it) kann von der des Geräts abweichen und bei
+         App Bundles liefert Play nur die Sprachressourcen des Geräts aus -->
+
+    <style name="TugaVollbildAlarmTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/tuga_vollbild_hintergrund</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="TugaVollbildButton">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">68dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="TugaVollbildButtonIcon">
+        <item name="android:layout_width">30dp</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:layout_marginEnd">12dp</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+
+    <style name="TugaVollbildButtonText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+</resources>

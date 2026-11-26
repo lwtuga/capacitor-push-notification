@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Vollbild-Alarm: ab Android 14 muss der Benutzer dies zusätzlich in den Einstellungen erlauben -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Vollbild-Alarm auch bei entsperrtem Gerät aus dem Hintergrund starten ("Über anderen Apps einblenden") -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application>
         <service android:name="com.capacitorjs.plugins.pushnotifications.MessagingService" android:exported="false">
             <intent-filter>
@@ -11,5 +16,16 @@
             android:enabled="true"
             android:exported="false">
         </provider>
+        <!-- eigener Task, damit nach dem Schließen wieder angezeigt wird, was vorher offen war (z.B. Sperrbildschirm) -->
+        <activity
+            android:name="com.capacitorjs.plugins.pushnotifications.vollbild.VollbildAlarmActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity="${applicationId}.vollbildalarm"
+            android:theme="@style/TugaVollbildAlarmTheme"
+            android:turnScreenOn="true" />
     </application>
 </manifest>

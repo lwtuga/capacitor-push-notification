@@ -151,6 +151,30 @@ export interface PushNotificationsPlugin {
      */
     openAutostartSettings(): Promise<void>;
     /**
+     * Berechtigungen für den Vollbild-Alarm (alle Alarme von RICs mit eingeschaltetem Vollbild), nur Android.
+     *
+     * @since 8.0.0
+     */
+    checkFullScreenAlarm(): Promise<FullScreenAlarmStatus>;
+    /**
+     * Öffnet ab Android 14 die Einstellung "Vollbild-Benachrichtigungen" der App, davor die Benachrichtigungseinstellungen. Nur Android.
+     *
+     * @since 8.0.0
+     */
+    openFullScreenIntentSettings(): Promise<void>;
+    /**
+     * Öffnet die Einstellung "Über anderen Apps einblenden", nur Android.
+     *
+     * @since 8.0.0
+     */
+    openOverlaySettings(): Promise<void>;
+    /**
+     * Öffnet bei Xiaomi (MIUI/HyperOS) "Weitere Berechtigungen" der App (Sperrbildschirm, Pop-up-Fenster im Hintergrund), nur Android.
+     *
+     * @since 8.0.0
+     */
+    openXiaomiPermissionSettings(): Promise<void>;
+    /**
      * Called when the push notification registration finishes without problems.
      *
      * Provides the push notification token.
@@ -423,6 +447,25 @@ export interface PermissionStatus {
      * @since 1.0.0
      */
     receive: PermissionState;
+}
+/**
+ * Status der Berechtigungen für den Vollbild-Alarm (nur Android).
+ *
+ * @since 8.0.0
+ */
+export interface FullScreenAlarmStatus {
+    /** Für mindestens einen RIC ist Vollbild eingeschaltet (Preferences ricalarmton) */
+    required: boolean;
+    /** Ab Android 14 "Vollbild-Benachrichtigungen" erlaubt, davor immer true */
+    fullScreenIntent: boolean;
+    /** "Über anderen Apps einblenden": Vollbild auch bei entsperrtem Gerät */
+    overlay: boolean;
+    /** Xiaomi Gerät (MIUI/HyperOS) */
+    xiaomi: boolean;
+    /** Xiaomi "Auf Sperrbildschirm anzeigen", bei anderen Herstellern 'true' */
+    xiaomiLockscreen: 'true' | 'false' | 'unknown';
+    /** Xiaomi "Pop-up-Fenster beim Ausführen im Hintergrund anzeigen", bei anderen Herstellern 'true' */
+    xiaomiPopup: 'true' | 'false' | 'unknown';
 }
 /**
  * @deprecated Use 'Channel`.
