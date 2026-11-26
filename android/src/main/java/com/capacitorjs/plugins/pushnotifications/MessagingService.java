@@ -123,7 +123,8 @@ public class MessagingService extends FirebaseMessagingService {
           Log.i("MessagingService", critical ? "Silent critical alarm - no sound played" : "Silent alarm - no sound and no vibration");
         } else if (sound != null) {
           Log.i("MessagingService", critical ? "Critical alarm - playing custom sound" : "Normal alarm - playing custom sound");
-          playAlarm(sound, critical);
+          // lange Vibration (Tonlänge) nur bei Alarmen, die das Backend als criticalalert sendet, sonst die normale der Benachrichtigung
+          playAlarm(sound, critical, Objects.equals(intent.getStringExtra("criticalalert"), "1"));
         }
 
         // zeigt Notification-Nachrichten an bzw. ruft bei Datennachrichten onMessageReceived auf, dort wird die Benachrichtigung angezeigt
@@ -218,7 +219,8 @@ public class MessagingService extends FirebaseMessagingService {
                 notificationInfo.notificationBuilder.setCategory(NotificationCompat.CATEGORY_ALARM);
             }
             Intent vollbildIntent = null;
-            if (VollbildAlarm.isVollbild(this, ric)) {
+            // Vollbild nur bei Alarmen, die das Backend als criticalalert sendet (unabhängig von "Lautlos-Modus umgehen")
+            if (Objects.equals(data.get("criticalalert"), "1") && VollbildAlarm.isVollbild(this, ric)) {
                 // Gesperrt/Bildschirm aus: Android startet die Activity über den Full-Screen-Intent, entsperrt zeigt es
                 // eine Heads-up-Benachrichtigung. Antippen öffnet ebenfalls das Vollbild statt direkt die App.
                 vollbildIntent = VollbildAlarm.createIntent(this, remoteMessage, notificationInfo.tag, notificationInfo.id);
@@ -306,7 +308,7 @@ public class MessagingService extends FirebaseMessagingService {
      * lautlos/vibrieren ist, kein Nicht-Stören aktiv ist und die Lautstärke nicht auf 0 steht - sonst mit der
      * aktuellen Benachrichtigungslautstärke.
      */
-    private void playAlarm(String sound, boolean critical) {
+    private void playAlarm(String sound, boolean critical, boolean langeVibration) {
         Uri soundUri = getSoundUri(sound);
         int durationMs = getSoundFileDuration(soundUri);
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
@@ -356,7 +358,9 @@ public class MessagingService extends FirebaseMessagingService {
                     ringtone.setVolume(1.0f);
                 }
                 ringtone.play();
-                startVibrationLocked(vibrator, critical);
+                if (langeVibration) {
+                    startVibrationLocked(vibrator, critical);
+                }
 
                 int generation = ++alarmGeneration;
                 MAIN_HANDLER.postDelayed(() -> finishAlarm(generation), durationMs + SOUND_END_BUFFER_MS);
@@ -406,6 +410,7 @@ public class MessagingService extends FirebaseMessagingService {
     }
 
     /**
+     * Nur bei criticalalert vom Backend, sonst bleibt die normale Vibration der Benachrichtigung.
      * Vibriert bis der Alarm beendet wird (Ende des Tons, Antippen, Vollbild-Button). Kritischer Alarm immer, normaler
      * Alarm wie das Gerät klingeln würde: nicht bei lautlos und nicht bei Nicht-Stören (vor dem Alarm).
      * USAGE_ALARM, da Android Vibrationen aus dem Hintergrund nur für bestimmte Verwendungen zulässt und lautlos
