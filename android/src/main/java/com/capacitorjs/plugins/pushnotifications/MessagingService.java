@@ -20,6 +20,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.VibrationAttributes;
+import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
 import android.util.Log;
@@ -57,11 +59,16 @@ public class MessagingService extends FirebaseMessagingService {
     private static final int SOUND_END_BUFFER_MS = 500;
     // wie im FirebaseMessagingService: an den letzten 10 Message-IDs werden doppelt zugestellte Nachrichten erkannt
     private static final int RECENT_MESSAGE_IDS_MAX = 10;
+    // Vibration während des Alarmtons, wie bei einem Anruf: 1 s vibrieren, 1 s Pause - wiederholt bis zum Ende des Tons
+    // (kurze Töne ca. 10 s, lange ca. 30 s). Wiederholend, damit die einmalige Vibration der Benachrichtigung sie nicht ersetzt
+    private static final long[] VIBRATION_PATTERN = {0, 1000, 1000};
 
     private static final Object LOCK = new Object();
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
     private static final ArrayDeque<String> recentMessageIds = new ArrayDeque<>();
     private static Ringtone ringtone;
+    // != null solange die Vibration des Alarms läuft
+    private static Vibrator alarmVibrator;
     // Einstellungen von vor dem Alarm, != null solange ein Alarmton läuft
     private static AlarmSession session;
     // verhindert, dass der verzögerte Stopp eines bereits ersetzten Alarms den neuen Alarm beendet
@@ -349,6 +356,7 @@ public class MessagingService extends FirebaseMessagingService {
                     ringtone.setVolume(1.0f);
                 }
                 ringtone.play();
+                startVibrationLocked(vibrator, critical);
 
                 int generation = ++alarmGeneration;
                 MAIN_HANDLER.postDelayed(() -> finishAlarm(generation), durationMs + SOUND_END_BUFFER_MS);
@@ -390,6 +398,47 @@ public class MessagingService extends FirebaseMessagingService {
         if (ringtone != null) {
             ringtone.stop();
             ringtone = null;
+        }
+        if (alarmVibrator != null) {
+            alarmVibrator.cancel();
+            alarmVibrator = null;
+        }
+    }
+
+    /**
+     * Vibriert bis der Alarm beendet wird (Ende des Tons, Antippen, Vollbild-Button). Kritischer Alarm immer, normaler
+     * Alarm wie das Gerät klingeln würde: nicht bei lautlos und nicht bei Nicht-Stören (vor dem Alarm).
+     * USAGE_ALARM, da Android Vibrationen aus dem Hintergrund nur für bestimmte Verwendungen zulässt und lautlos
+     * Wecker-Vibrationen nicht unterdrückt.
+     */
+    private static void startVibrationLocked(Vibrator vibrator, boolean critical) {
+        if (vibrator == null || !vibrator.hasVibrator()) {
+            return;
+        }
+        if (!critical && session != null && !session.normalAlarmMayVibrate()) {
+            Log.i("MessagingService", "Normal alarm - device silent or DND: no vibration");
+            return;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                vibrator.vibrate(VibrationEffect.createWaveform(VIBRATION_PATTERN, 0),
+                    VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM));
+            } else {
+                vibrateLegacy(vibrator);
+            }
+            alarmVibrator = vibrator;
+        } catch (RuntimeException e) {
+            Log.e("MessagingService", "vibration failed", e);
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void vibrateLegacy(Vibrator vibrator) {
+        AudioAttributes attributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(VIBRATION_PATTERN, 0), attributes);
+        } else {
+            vibrator.vibrate(VIBRATION_PATTERN, 0, attributes);
         }
     }
 
@@ -527,6 +576,11 @@ public class MessagingService extends FirebaseMessagingService {
             return notificationManager != null
                 ? notificationManager.getCurrentInterruptionFilter()
                 : NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+        }
+
+        /** Normaler Alarm vibriert nur, wenn das Gerät vor dem Alarm weder lautlos noch auf Nicht-Stören stand. */
+        boolean normalAlarmMayVibrate() {
+            return originalRingerMode != AudioManager.RINGER_MODE_SILENT && !isDnd(originalInterruptionFilter);
         }
 
         private static boolean isDnd(int interruptionFilter) {
