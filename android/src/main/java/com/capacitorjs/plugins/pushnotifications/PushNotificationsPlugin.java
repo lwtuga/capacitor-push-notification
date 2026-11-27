@@ -12,6 +12,11 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.IntentCompat;
+import androidx.core.content.PackageManagerCompat;
+import androidx.core.content.UnusedAppRestrictionsConstants;
+import com.google.common.util.concurrent.ListenableFuture;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -297,6 +302,58 @@ public class PushNotificationsPlugin extends Plugin {
   public void openOverlaySettings(PluginCall call) {
     String packageName = getContext().getPackageName();
     if (!startSettings(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + packageName)))) {
+      startSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)));
+    }
+    call.resolve();
+  }
+
+  /**
+   * "App-Aktivität bei Nichtnutzung pausieren" (App-Ruhezustand). Ab Android 12 (API_31) erhält eine pausierte App nach
+   * einigen Monaten ohne Nutzung keine Pushes mehr (auch keine FCM-Nachrichten mit hoher Priorität), zudem werden die
+   * Laufzeitberechtigungen (ab Android 13 auch Benachrichtigungen) zurückgesetzt. Android 11 bzw. die Nachrüstung über
+   * Google Play (API_30, API_30_BACKPORT) setzen nur Laufzeitberechtigungen zurück, Benachrichtigungen sind dort keine
+   * und Pushes kommen weiterhin an: für Alarmierungen nicht nötig.
+   * value: "true" nicht aktiv bzw. ohne Auswirkung auf Pushes, "false" aktiv, "unknown" nicht lesbar
+   */
+  @PluginMethod
+  public void checkUnusedAppRestrictions(PluginCall call) {
+    final ListenableFuture<Integer> future;
+    try {
+      future = PackageManagerCompat.getUnusedAppRestrictionsStatus(getContext());
+    } catch (RuntimeException e) {
+      Log.w("PushNotificationsPlugin", "unused app restrictions not readable", e);
+      call.resolve(new JSObject().put("value", "unknown"));
+      return;
+    }
+    future.addListener(() -> {
+      String value = "unknown";
+      try {
+        int status = future.get();
+        Log.i("PushNotificationsPlugin", "unused app restrictions status " + status);
+        if (status == UnusedAppRestrictionsConstants.API_31) {
+          value = "false";
+        } else if (status != UnusedAppRestrictionsConstants.ERROR) {
+          value = "true";
+        }
+      } catch (Exception e) {
+        Log.w("PushNotificationsPlugin", "unused app restrictions not readable", e);
+      }
+      call.resolve(new JSObject().put("value", value));
+    }, ContextCompat.getMainExecutor(getContext()));
+  }
+
+  /** Einstellung "App-Aktivität bei Nichtnutzung pausieren" der App (Name je nach Android-Version unterschiedlich) */
+  @PluginMethod
+  public void openUnusedAppRestrictionsSettings(PluginCall call) {
+    String packageName = getContext().getPackageName();
+    Intent intent = null;
+    try {
+      intent = IntentCompat.createManageUnusedAppRestrictionsIntent(getContext(), packageName);
+    } catch (RuntimeException e) {
+      // auf dem Gerät nicht vorhanden (UnsupportedOperationException)
+      Log.w("PushNotificationsPlugin", "unused app restrictions settings not available", e);
+    }
+    if (intent == null || !startSettings(intent)) {
       startSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)));
     }
     call.resolve();

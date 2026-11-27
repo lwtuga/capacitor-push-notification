@@ -175,6 +175,23 @@ export interface PushNotificationsPlugin {
      */
     openXiaomiPermissionSettings(): Promise<void>;
     /**
+     * "App-Aktivität bei Nichtnutzung pausieren" (App-Ruhezustand), nur Android.
+     * Ab Android 12 erhält eine pausierte App nach einigen Monaten ohne Nutzung keine Pushes mehr (auch keine
+     * FCM-Nachrichten mit hoher Priorität) und ihre Laufzeitberechtigungen werden zurückgesetzt.
+     * value: 'true' nicht aktiv bzw. ohne Auswirkung auf Pushes (vor Android 12), 'false' aktiv, 'unknown' nicht lesbar
+     *
+     * @since 8.0.0
+     */
+    checkUnusedAppRestrictions(): Promise<{
+        value: 'true' | 'false' | 'unknown';
+    }>;
+    /**
+     * Öffnet die Einstellung "App-Aktivität bei Nichtnutzung pausieren" der App (ab Android 12 in den App-Infos), nur Android.
+     *
+     * @since 8.0.0
+     */
+    openUnusedAppRestrictionsSettings(): Promise<void>;
+    /**
      * Called when the push notification registration finishes without problems.
      *
      * Provides the push notification token.
