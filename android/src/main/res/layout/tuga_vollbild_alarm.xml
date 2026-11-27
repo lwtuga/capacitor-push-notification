@@ -32,8 +32,9 @@
         android:textColor="@color/tuga_vollbild_rot"
         android:textSize="30sp" />
 
-    <!-- Push-Text -->
+    <!-- Push-Text, Hintergrund und Textfarbe je nach Push-Art (VollbildAlarmActivity.karteFaerben) -->
     <FrameLayout
+        android:id="@+id/tuga_vollbild_karte"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="24dp"
@@ -118,6 +119,78 @@
             <ImageView style="@style/TugaVollbildButtonIcon" android:contentDescription="@null" android:src="@drawable/tuga_vollbild_ic_schliessen" />
 
             <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_nichtverfuegbar_text" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- nach "Verzögert": Auswahl der Verzögerung (enuEinsatzVerfuegbarkeitVerzoegerung), erst diese wird gesendet.
+         Zurück zeigt wieder Ich komme / Verzögert / Nicht verfügbar -->
+    <LinearLayout
+        android:id="@+id/tuga_vollbild_buttons_verzoegerung"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_minuten5"
+            style="@style/TugaVollbildButton.Minuten"
+            android:layout_width="match_parent"
+            android:background="@drawable/tuga_vollbild_button_orange">
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_minuten5_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_minuten10"
+            style="@style/TugaVollbildButton.Minuten"
+            android:layout_width="match_parent"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/tuga_vollbild_button_orange">
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_minuten10_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_minuten15"
+            style="@style/TugaVollbildButton.Minuten"
+            android:layout_width="match_parent"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/tuga_vollbild_button_orange">
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_minuten15_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_minuten30"
+            style="@style/TugaVollbildButton.Minuten"
+            android:layout_width="match_parent"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/tuga_vollbild_button_orange">
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_minuten30_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_minuten60"
+            style="@style/TugaVollbildButton.Minuten"
+            android:layout_width="match_parent"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/tuga_vollbild_button_orange">
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_minuten60_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tuga_vollbild_zurueck"
+            style="@style/TugaVollbildButton.Minuten"
+            android:layout_width="match_parent"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/tuga_vollbild_button_grau">
+
+            <ImageView style="@style/TugaVollbildButtonIcon" android:contentDescription="@null" android:src="@drawable/tuga_vollbild_ic_zurueck" />
+
+            <TextView style="@style/TugaVollbildButtonText" android:id="@+id/tuga_vollbild_zurueck_text" />
         </LinearLayout>
     </LinearLayout>
 

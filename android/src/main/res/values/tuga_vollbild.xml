@@ -8,6 +8,11 @@
     <color name="tuga_vollbild_gruen">#2DC84D</color>
     <color name="tuga_vollbild_orange">#FF9500</color>
     <color name="tuga_vollbild_grau">#8E8E93</color>
+    <!-- Karte mit dem Push-Text je nach Push-Art: Einsatz dunkelblau/weiß, Übung gelb/schwarz, sonst karte/text -->
+    <color name="tuga_vollbild_karte_einsatz">#34527F</color>
+    <color name="tuga_vollbild_text_einsatz">#FFFFFF</color>
+    <color name="tuga_vollbild_karte_uebung">#FFCC00</color>
+    <color name="tuga_vollbild_text_uebung">#000000</color>
 
     <!-- Texte stehen in VollbildTexte.java: die Sprache der App (de/it) kann von der des Geräts abweichen und bei
          App Bundles liefert Play nur die Sprachressourcen des Geräts aus -->
@@ -30,6 +35,11 @@
         <item name="android:paddingBottom">8dp</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
+    </style>
+
+    <!-- Auswahl der Verzögerung: 6 Buttons untereinander, deshalb etwas niedriger -->
+    <style name="TugaVollbildButton.Minuten">
+        <item name="android:minHeight">56dp</item>
     </style>
 
     <style name="TugaVollbildButtonIcon">

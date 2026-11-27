@@ -27,7 +27,8 @@ final class VerfuegbarkeitPublisher {
 
     private VerfuegbarkeitPublisher() {}
 
-    static boolean senden(Context context, Bundle daten, int typ) {
+    /** verzoegerung: nur bei Verzögert (enuEinsatzVerfuegbarkeitVerzoegerung), sonst null */
+    static boolean senden(Context context, Bundle daten, int typ, Integer verzoegerung) {
         String einsatzId = daten != null ? daten.getString("einsatz") : null;
         if (einsatzId == null || einsatzId.isEmpty()) {
             Log.w(TAG, "keine einsatz_id");
@@ -51,6 +52,9 @@ final class VerfuegbarkeitPublisher {
             in.put("id", einsatzId);
             in.put("pushdevice_id", pushdeviceId);
             in.put("typ", typ);
+            if (verzoegerung != null) {
+                in.put("verzoegerung", verzoegerung.intValue());
+            }
             JSONObject body = new JSONObject();
             body.put("data", in);
             byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
@@ -69,7 +73,7 @@ final class VerfuegbarkeitPublisher {
             }
 
             int responseCode = connection.getResponseCode();
-            Log.i(TAG, "einsatzverfuegbarkeitpush typ " + typ + " response " + responseCode);
+            Log.i(TAG, "einsatzverfuegbarkeitpush typ " + typ + " verzoegerung " + verzoegerung + " response " + responseCode);
             return responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

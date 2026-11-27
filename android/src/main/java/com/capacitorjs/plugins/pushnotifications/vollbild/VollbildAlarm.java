@@ -38,14 +38,24 @@ public final class VollbildAlarm {
     static final String EXTRA_DATEN = "vollbild_daten";
     static final String EXTRA_NOTIFICATION_TAG = "vollbild_notification_tag";
     static final String EXTRA_NOTIFICATION_ID = "vollbild_notification_id";
-    // gewählte Verfügbarkeit, wird beim Öffnen der App mitgegeben. gesendet=false: die App sendet sie selbst nach
+    // gewählte Verfügbarkeit (bei Verzögert mit Verzögerung), wird beim Öffnen der App mitgegeben.
+    // gesendet=false: die App sendet sie selbst nach
     static final String DATEN_TYP = "vollbild_typ";
+    static final String DATEN_VERZOEGERUNG = "vollbild_verzoegerung";
     static final String DATEN_GESENDET = "vollbild_gesendet";
 
     // enuEinsatzVerfuegbarkeitTyp
     static final int TYP_ICHKOMME = 1;
     static final int TYP_VERZOEGERT = 2;
     static final int TYP_NICHTVERFUEGBAR = 3;
+
+    // enuEinsatzVerfuegbarkeitVerzoegerung: 1 = 5 Minuten, 2 = 10, 3 = 15, 4 = 30, 5 = 60 Minuten
+    static final int VERZOEGERUNG_MINUTEN5 = 1;
+    static final int VERZOEGERUNG_MINUTEN60 = 5;
+
+    // enuPushArt (Push-Feld art)
+    static final String ART_EINSATZ = "1";
+    static final String ART_UEBUNG = "4";
 
     private VollbildAlarm() {}
 

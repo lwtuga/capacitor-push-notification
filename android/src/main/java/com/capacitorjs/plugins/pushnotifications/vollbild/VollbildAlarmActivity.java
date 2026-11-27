@@ -12,7 +12,10 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
+import androidx.annotation.RequiresApi;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -26,12 +29,30 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Vollbild-Alarm (auch über dem Sperrbildschirm): oben der Push-Titel, in der Mitte der Push-Text.
- * Mit Einsatz: Ich komme / Verzögert / Nicht verfügbar - jede Auswahl wird an das Backend gesendet, bei Ich komme
- * und Verzögert wird danach die App mit dem Einsatz geöffnet. Ohne Einsatz: App öffnen / Schließen.
+ * Vollbild-Alarm (auch über dem Sperrbildschirm): oben der Push-Titel, in der Mitte der Push-Text (Hintergrund je
+ * nach Push-Art: Einsatz dunkelblau, Übung gelb, sonst grau).
+ * Mit Einsatz: Ich komme / Verzögert / Nicht verfügbar. Verzögert zeigt zuerst die Auswahl der Verzögerung
+ * (5 / 10 / 15 / 30 / 60 Minuten, Zurück). Jede Auswahl wird an das Backend gesendet, bei Ich komme und Verzögert
+ * wird danach die App mit dem Einsatz geöffnet. Ohne Einsatz: App öffnen / Schließen.
  */
 public class VollbildAlarmActivity extends Activity {
     private static final String TAG = "VollbildAlarmActivity";
+
+    // Auswahl der Verzögerung, Reihenfolge wie enuEinsatzVerfuegbarkeitVerzoegerung (VollbildTexte.minuten)
+    private static final int[] MINUTEN_BUTTONS = {
+        R.id.tuga_vollbild_minuten5,
+        R.id.tuga_vollbild_minuten10,
+        R.id.tuga_vollbild_minuten15,
+        R.id.tuga_vollbild_minuten30,
+        R.id.tuga_vollbild_minuten60
+    };
+    private static final int[] MINUTEN_TEXTE = {
+        R.id.tuga_vollbild_minuten5_text,
+        R.id.tuga_vollbild_minuten10_text,
+        R.id.tuga_vollbild_minuten15_text,
+        R.id.tuga_vollbild_minuten30_text,
+        R.id.tuga_vollbild_minuten60_text
+    };
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -39,14 +60,21 @@ public class VollbildAlarmActivity extends Activity {
     private String notificationTag;
     private int notificationId;
     private boolean sendet;
+    private boolean mitEinsatz;
+    // nach "Verzögert": die Auswahl der Verzögerung wird angezeigt
+    private boolean verzoegerungAuswahl;
+    // ab Android 13 (OnBackInvokedCallback): Zurück in der Auswahl der Verzögerung, als Object wegen älterer Android-Versionen
+    private Object zurueckCallback;
 
     private VollbildTexte texte;
     private TextView zeitView;
     private TextView titelView;
+    private View karteView;
     private TextView textView;
     private TextView statusView;
     private View progressView;
     private View buttonsEinsatz;
+    private View buttonsVerzoegerung;
     private View buttonsOhneEinsatz;
 
     @Override
@@ -58,10 +86,12 @@ public class VollbildAlarmActivity extends Activity {
 
         zeitView = findViewById(R.id.tuga_vollbild_zeit);
         titelView = findViewById(R.id.tuga_vollbild_titel);
+        karteView = findViewById(R.id.tuga_vollbild_karte);
         textView = findViewById(R.id.tuga_vollbild_text);
         statusView = findViewById(R.id.tuga_vollbild_status);
         progressView = findViewById(R.id.tuga_vollbild_progress);
         buttonsEinsatz = findViewById(R.id.tuga_vollbild_buttons_einsatz);
+        buttonsVerzoegerung = findViewById(R.id.tuga_vollbild_buttons_verzoegerung);
         buttonsOhneEinsatz = findViewById(R.id.tuga_vollbild_buttons_ohne_einsatz);
 
         texte = VollbildTexte.fuer(this);
@@ -70,14 +100,25 @@ public class VollbildAlarmActivity extends Activity {
         ((TextView) findViewById(R.id.tuga_vollbild_nichtverfuegbar_text)).setText(texte.nichtVerfuegbar);
         ((TextView) findViewById(R.id.tuga_vollbild_appoeffnen_text)).setText(texte.appOeffnen);
         ((TextView) findViewById(R.id.tuga_vollbild_schliessen_text)).setText(texte.schliessen);
+        ((TextView) findViewById(R.id.tuga_vollbild_zurueck_text)).setText(texte.zurueck);
 
-        findViewById(R.id.tuga_vollbild_ichkomme).setOnClickListener(v -> rueckmelden(VollbildAlarm.TYP_ICHKOMME, true));
-        findViewById(R.id.tuga_vollbild_verzoegert).setOnClickListener(v -> rueckmelden(VollbildAlarm.TYP_VERZOEGERT, true));
-        findViewById(R.id.tuga_vollbild_nichtverfuegbar).setOnClickListener(v -> rueckmelden(VollbildAlarm.TYP_NICHTVERFUEGBAR, false));
+        findViewById(R.id.tuga_vollbild_ichkomme).setOnClickListener(v -> rueckmelden(VollbildAlarm.TYP_ICHKOMME, true, null));
+        findViewById(R.id.tuga_vollbild_verzoegert).setOnClickListener(v -> {
+            // gesendet wird erst die Auswahl der Verzögerung. Der Alarmton endet, der Benutzer hat reagiert
+            MessagingService.stopRingtone();
+            verzoegerungAuswahlAnzeigen(true);
+        });
+        findViewById(R.id.tuga_vollbild_nichtverfuegbar).setOnClickListener(v -> rueckmelden(VollbildAlarm.TYP_NICHTVERFUEGBAR, false, null));
+        for (int i = 0; i < MINUTEN_BUTTONS.length; i++) {
+            ((TextView) findViewById(MINUTEN_TEXTE[i])).setText(texte.minuten[i]);
+            final int verzoegerung = VollbildAlarm.VERZOEGERUNG_MINUTEN5 + i;
+            findViewById(MINUTEN_BUTTONS[i]).setOnClickListener(v -> rueckmelden(VollbildAlarm.TYP_VERZOEGERT, true, verzoegerung));
+        }
+        findViewById(R.id.tuga_vollbild_zurueck).setOnClickListener(v -> verzoegerungAuswahlAnzeigen(false));
         findViewById(R.id.tuga_vollbild_appoeffnen).setOnClickListener(v -> {
             MessagingService.stopRingtone();
             benachrichtigungEntfernen();
-            appOeffnen(null, false);
+            appOeffnen(null, null, false);
         });
         findViewById(R.id.tuga_vollbild_schliessen).setOnClickListener(v -> {
             // Die Benachrichtigung bleibt, über sie lässt sich der Alarm erneut öffnen
@@ -100,6 +141,18 @@ public class VollbildAlarmActivity extends Activity {
     protected void onDestroy() {
         executor.shutdown();
         super.onDestroy();
+    }
+
+    // bis Android 15 (ab Android 16 über zurueckCallback): Zurück in der Auswahl der Verzögerung zeigt wieder
+    // Ich komme / Verzögert / Nicht verfügbar
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        if (verzoegerungAuswahl) {
+            verzoegerungAuswahlAnzeigen(false);
+            return;
+        }
+        super.onBackPressed();
     }
 
     private void ueberSperrbildschirmAnzeigen() {
@@ -149,13 +202,63 @@ public class VollbildAlarmActivity extends Activity {
         titelView.setText(titel != null && !titel.isEmpty() ? titel : texte.titel);
         String text = daten.getString("body");
         textView.setText(text != null ? text : "");
+        karteFaerben(daten.getString("art"));
 
         String einsatzId = daten.getString("einsatz");
-        boolean mitEinsatz = einsatzId != null && !einsatzId.isEmpty() && !"null".equals(einsatzId);
-        buttonsEinsatz.setVisibility(mitEinsatz ? View.VISIBLE : View.GONE);
-        buttonsOhneEinsatz.setVisibility(mitEinsatz ? View.GONE : View.VISIBLE);
+        mitEinsatz = einsatzId != null && !einsatzId.isEmpty() && !"null".equals(einsatzId);
+        verzoegerungAuswahl = false;
+        buttonsAnzeigen();
         statusAnzeigen(null, false);
         buttonsAktivieren(true);
+    }
+
+    // Karte mit dem Push-Text je nach Push-Art (enuPushArt): Einsatz dunkelblau mit weißer Schrift, Übung gelb mit
+    // schwarzer Schrift, alle anderen (Information, Test, Digitale Alarmierung) grau
+    private void karteFaerben(String art) {
+        String pushArt = art != null ? art.trim() : "";
+        int hintergrund = R.drawable.tuga_vollbild_karte;
+        int textFarbe = R.color.tuga_vollbild_text;
+        if (VollbildAlarm.ART_EINSATZ.equals(pushArt)) {
+            hintergrund = R.drawable.tuga_vollbild_karte_einsatz;
+            textFarbe = R.color.tuga_vollbild_text_einsatz;
+        } else if (VollbildAlarm.ART_UEBUNG.equals(pushArt)) {
+            hintergrund = R.drawable.tuga_vollbild_karte_uebung;
+            textFarbe = R.color.tuga_vollbild_text_uebung;
+        }
+        karteView.setBackgroundResource(hintergrund);
+        textView.setTextColor(getColor(textFarbe));
+    }
+
+    private void verzoegerungAuswahlAnzeigen(boolean anzeigen) {
+        if (sendet) {
+            // während des Sendens bleibt die Ansicht
+            return;
+        }
+        verzoegerungAuswahl = anzeigen;
+        buttonsAnzeigen();
+        statusAnzeigen(null, false);
+    }
+
+    private void buttonsAnzeigen() {
+        buttonsEinsatz.setVisibility(mitEinsatz && !verzoegerungAuswahl ? View.VISIBLE : View.GONE);
+        buttonsVerzoegerung.setVisibility(mitEinsatz && verzoegerungAuswahl ? View.VISIBLE : View.GONE);
+        buttonsOhneEinsatz.setVisibility(mitEinsatz ? View.GONE : View.VISIBLE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            zurueckAbfangen(mitEinsatz && verzoegerungAuswahl);
+        }
+    }
+
+    // Ab Android 16 (targetSdk 36) ruft Android onBackPressed nicht mehr auf, Zurück geht dann an den registrierten Callback
+    @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
+    private void zurueckAbfangen(boolean abfangen) {
+        if (abfangen && zurueckCallback == null) {
+            OnBackInvokedCallback callback = () -> verzoegerungAuswahlAnzeigen(false);
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
+            zurueckCallback = callback;
+        } else if (!abfangen && zurueckCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback((OnBackInvokedCallback) zurueckCallback);
+            zurueckCallback = null;
+        }
     }
 
     // Das Backend sendet "YYYY-MM-DD HH:MM:SS", angezeigt wird "DD.MM.YYYY HH:MM:SS" (italienisch "DD/MM/YYYY HH:MM:SS").
@@ -176,7 +279,8 @@ public class VollbildAlarmActivity extends Activity {
         return datum[2] + texte.datumTrenner + datum[1] + texte.datumTrenner + datum[0] + " " + zeit.substring(leerzeichen + 1).trim();
     }
 
-    private void rueckmelden(final int typ, final boolean appOeffnen) {
+    /** verzoegerung: nur bei Verzögert (enuEinsatzVerfuegbarkeitVerzoegerung), sonst null */
+    private void rueckmelden(final int typ, final boolean appOeffnen, final Integer verzoegerung) {
         if (sendet) {
             return;
         }
@@ -188,21 +292,21 @@ public class VollbildAlarmActivity extends Activity {
         final Bundle gesendeteDaten = daten;
         final Context appContext = getApplicationContext();
         executor.execute(() -> {
-            final boolean gesendet = VerfuegbarkeitPublisher.senden(appContext, gesendeteDaten, typ);
-            runOnUiThread(() -> nachRueckmeldung(gesendeteDaten, typ, appOeffnen, gesendet));
+            final boolean gesendet = VerfuegbarkeitPublisher.senden(appContext, gesendeteDaten, typ, verzoegerung);
+            runOnUiThread(() -> nachRueckmeldung(gesendeteDaten, typ, verzoegerung, appOeffnen, gesendet));
         });
     }
 
-    private void nachRueckmeldung(Bundle gesendeteDaten, int typ, boolean appOeffnen, boolean gesendet) {
+    private void nachRueckmeldung(Bundle gesendeteDaten, int typ, Integer verzoegerung, boolean appOeffnen, boolean gesendet) {
         if (isFinishing() || isDestroyed() || gesendeteDaten != daten) {
             // inzwischen geschlossen oder durch einen neuen Alarm ersetzt
             return;
         }
         if (appOeffnen) {
-            // auch wenn das Senden fehlgeschlagen ist: die App sendet die Verfügbarkeit dann selbst
+            // auch wenn das Senden fehlgeschlagen ist: die App sendet die Verfügbarkeit (mit Verzögerung) dann selbst
             statusAnzeigen(gesendet ? texte.gesendet : null, false);
             benachrichtigungEntfernen();
-            appOeffnen(typ, gesendet);
+            appOeffnen(typ, verzoegerung, gesendet);
             return;
         }
         if (gesendet) {
@@ -224,7 +328,7 @@ public class VollbildAlarmActivity extends Activity {
      * Öffnet die App wie beim Antippen der Benachrichtigung (pushNotificationActionPerformed mit den Push-Daten).
      * Ist das Gerät gesperrt, muss es zuerst entsperrt werden.
      */
-    private void appOeffnen(final Integer typ, final boolean gesendet) {
+    private void appOeffnen(final Integer typ, final Integer verzoegerung, final boolean gesendet) {
         final Intent launchIntent = getPackageManager().getLaunchIntentForPackage(getPackageName());
         if (launchIntent == null) {
             finish();
@@ -235,6 +339,9 @@ public class VollbildAlarmActivity extends Activity {
         if (typ != null) {
             extras.putString(VollbildAlarm.DATEN_TYP, String.valueOf(typ));
             extras.putString(VollbildAlarm.DATEN_GESENDET, String.valueOf(gesendet));
+        }
+        if (verzoegerung != null) {
+            extras.putString(VollbildAlarm.DATEN_VERZOEGERUNG, String.valueOf(verzoegerung));
         }
         launchIntent.putExtras(extras);
 
@@ -298,13 +405,20 @@ public class VollbildAlarmActivity extends Activity {
             R.id.tuga_vollbild_ichkomme,
             R.id.tuga_vollbild_verzoegert,
             R.id.tuga_vollbild_nichtverfuegbar,
+            R.id.tuga_vollbild_zurueck,
             R.id.tuga_vollbild_appoeffnen,
             R.id.tuga_vollbild_schliessen
         };
         for (int id : ids) {
-            View button = findViewById(id);
-            button.setEnabled(aktiv);
-            button.setAlpha(aktiv ? 1f : 0.5f);
+            buttonAktivieren(findViewById(id), aktiv);
         }
+        for (int id : MINUTEN_BUTTONS) {
+            buttonAktivieren(findViewById(id), aktiv);
+        }
+    }
+
+    private static void buttonAktivieren(View button, boolean aktiv) {
+        button.setEnabled(aktiv);
+        button.setAlpha(aktiv ? 1f : 0.5f);
     }
 }

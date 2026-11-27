@@ -19,6 +19,9 @@ final class VollbildTexte {
     final String fehler;
     /** Trennzeichen im Datum der Alarmierungszeit: 26.11.2026 bzw. 26/11/2026 */
     final String datumTrenner;
+    /** Auswahl der Verzögerung, Reihenfolge wie enuEinsatzVerfuegbarkeitVerzoegerung (1 = 5 Minuten, ... 5 = 60 Minuten) */
+    final String[] minuten;
+    final String zurueck;
 
     private static final VollbildTexte DE = new VollbildTexte(
         "Neuer Einsatz",
@@ -30,7 +33,9 @@ final class VollbildTexte {
         "Rückmeldung wird gesendet …",
         "Rückmeldung gesendet",
         "Rückmeldung konnte nicht gesendet werden. Bitte erneut versuchen.",
-        "."
+        ".",
+        new String[] {"5 Minuten", "10 Minuten", "15 Minuten", "30 Minuten", "60 Minuten"},
+        "Zurück"
     );
 
     private static final VollbildTexte IT = new VollbildTexte(
@@ -43,11 +48,14 @@ final class VollbildTexte {
         "Invio della risposta …",
         "Risposta inviata",
         "Impossibile inviare la risposta. Riprovare.",
-        "/"
+        "/",
+        new String[] {"5 minuti", "10 minuti", "15 minuti", "30 minuti", "60 minuti"},
+        "Indietro"
     );
 
     private VollbildTexte(String titel, String ichKomme, String verzoegert, String nichtVerfuegbar, String appOeffnen,
-                          String schliessen, String wirdGesendet, String gesendet, String fehler, String datumTrenner) {
+                          String schliessen, String wirdGesendet, String gesendet, String fehler, String datumTrenner,
+                          String[] minuten, String zurueck) {
         this.titel = titel;
         this.ichKomme = ichKomme;
         this.verzoegert = verzoegert;
@@ -58,6 +66,8 @@ final class VollbildTexte {
         this.gesendet = gesendet;
         this.fehler = fehler;
         this.datumTrenner = datumTrenner;
+        this.minuten = minuten;
+        this.zurueck = zurueck;
     }
 
     static VollbildTexte fuer(Context context) {
