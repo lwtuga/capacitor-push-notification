@@ -734,13 +734,29 @@ public class MessagingService extends FirebaseMessagingService {
                 originalAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
                 originalAlarmVolumeKnown = true;
             }
+            int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+            // ohne FLAG_ALLOW_RINGER_MODES: damit setzt Android bei einer Lautstärke > 0 auch den Klingelmodus auf normal,
+            // vibrieren/lautlos ginge verloren
+            setAlarmVolume(max, 0);
+            if (audioManager.getStreamVolume(AudioManager.STREAM_ALARM) >= max && !audioManager.isStreamMute(AudioManager.STREAM_ALARM)) {
+                return;
+            }
+            // Bei aktivem Nicht-Stören lehnt Android die Änderung eines stummen Streams ohne das Flag ab. Ändert sich dabei
+            // der Klingelmodus, wird er am Ende des Alarms wiederhergestellt.
+            int ringerMode = audioManager.getRingerMode();
+            setAlarmVolume(max, AudioManager.FLAG_ALLOW_RINGER_MODES);
+            if (audioManager.getRingerMode() != ringerMode) {
+                Log.w("MessagingService", "ringerMode " + ringerMode + " set to " + audioManager.getRingerMode() + " by raising the alarm volume");
+                ringerModeChanged = true;
+            }
+        }
+
+        private void setAlarmVolume(int volume, int flags) {
             try {
-                // FLAG_ALLOW_RINGER_MODES: Android lehnt die Änderung sonst bei aktivem Nicht-Stören teils ab
-                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM),
-                    AudioManager.FLAG_ALLOW_RINGER_MODES);
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, volume, flags);
                 alarmVolumeChanged = true;
             } catch (Exception e) {
-                Log.e("MessagingService", "max alarm volume not set", e);
+                Log.e("MessagingService", "max alarm volume not set (flags " + flags + ")", e);
             }
         }
 
